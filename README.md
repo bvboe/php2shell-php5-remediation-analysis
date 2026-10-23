@@ -50,9 +50,49 @@ with realistic surface area rather than a single script.
 Seeded logins are in `lab/app/lib/db.php`. Advisers `a.shah`, `d.okafor`; customers
 `j.whitlow`, `m.ferreira`, `p.lindqvist`.
 
-## The probes
+## Reproducing the findings
 
-Each isolates one behaviour. None contains exploit code.
+```bash
+docker compose up -d --build
+bash scripts/compare.sh
+```
+
+That is the whole proof. It takes about a minute and prints a verdict for both
+attack routes, telling you whether each reproduced.
+
+**Route 1, out-of-memory.** The unpatched build keeps executing PHP after the fatal and
+the same workers carry on serving. The patched build runs nothing after the fatal and the
+worker that took the request is gone, replaced by a new one. That is the precondition
+these CVEs depend on, present and then absent.
+
+**Route 2, session keys.** On the unpatched build a string the attacker put in the
+multipart body appears inside a session *key name*, with the application never involved:
+
+```
+upload_progress_INJECTED-MARKER|a:5:{s:10:"start_time";i:...
+```
+
+On the patched build no session file is written at all.
+
+### Running one runtime at a time
+
+```bash
+bash lab/probe/run-test.sh php56-unpatched
+bash lab/probe/run-test.sh php56-patched
+bash lab/probe/run-test.sh hhvm330
+```
+
+The service name is all you need; the port and container are resolved from compose.
+
+> **Careful with `hhvm330`.** HHVM does not enforce `memory_limit` in server mode, so this
+> test drives it until the kernel out-of-memory killer takes the whole process. That is
+> the finding, not a mistake, but it will stop the container. Bring it back with
+> `docker compose start hhvm330`. See FINDINGS.md section 4.
+
+### The probes individually
+
+Each isolates one behaviour. None contains exploit code. They are mounted at `/probe/`
+inside each container, so for example `http://localhost:8059/probe/limit-probe.php`.
 
 | Probe | Question it answers |
 |---|---|
@@ -62,17 +102,6 @@ Each isolates one behaviour. None contains exploit code.
 | `progress-read.php` | Does attacker-supplied data reach the session? |
 | `fatal-kinds.php` | Which kinds of fatal still run shutdown handlers? |
 | `count-parts.php` | How many multipart body parts are accepted? |
-| `run-test.sh` | Worker-survival harness: identity, trigger, identity again |
-
-Example, the central comparison:
-
-```bash
-bash lab/probe/run-test.sh "unpatched" 8059 <container>
-bash lab/probe/run-test.sh "patched"   8056 <container>
-```
-
-The unpatched build keeps serving from the same workers and runs its shutdown handler. The
-patched build loses the worker that took the request and runs nothing after the fatal.
 
 ## Verifying the source claims
 
