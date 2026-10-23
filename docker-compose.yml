@@ -1,0 +1,20 @@
+# Three runtimes, same application, for comparison.
+#
+# WARNING: php56-unpatched deliberately runs an unpatched, end-of-life PHP with
+# known unauthenticated RCE. Keep this on a local machine. Do not expose it.
+services:
+  php56-unpatched:          # PHP 5.6.40 (Jan 2019), Apache + mod_php
+    build: { context: ./lab, dockerfile: Dockerfile.php56 }
+    ports: ["8059:80"]
+    volumes: ["./lab/probe:/var/www/html/probe:ro"]
+
+  php56-patched:            # php5.6 5.6.40-105 from deb.sury.org, Apache + mod_php
+    build: { context: ./lab, dockerfile: Dockerfile.php56-patched }
+    ports: ["8056:80"]
+    volumes: ["./lab/probe:/var/www/html/probe:ro"]
+
+  hhvm330:                  # HHVM 3.30.12, built-in server (amd64 only)
+    build: { context: ./lab, dockerfile: Dockerfile.hhvm330 }
+    platform: linux/amd64
+    ports: ["8057:80"]
+    volumes: ["./lab/probe:/var/www/html/probe:ro"]

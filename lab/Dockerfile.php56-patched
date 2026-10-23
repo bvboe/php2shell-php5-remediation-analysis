@@ -1,0 +1,44 @@
+# Patched PHP 5.6 for php2shell (CVE-2026-109618 / CVE-2026-109619).
+#
+# php5.6 5.6.40-104 or later from deb.sury.org carries
+# 0261-Avoid-state-corruption-via-bailout.patch, a vendor backport of the PHP
+# security team's official 7.4 patch. See FINDINGS.md section 2 on provenance.
+#
+# Deliberately Apache + mod_php, matching Dockerfile.php56, so the ONLY variable
+# between the two images is the patch.
+FROM ubuntu:noble
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends ca-certificates gnupg curl \
+ && install -d /usr/share/keyrings \
+ && curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14aa40ec0831756756d7f66c4f4ea0aae5267a6c" \
+      | gpg --dearmor -o /usr/share/keyrings/ondrej.gpg \
+ && . /etc/os-release \
+ && echo "deb [signed-by=/usr/share/keyrings/ondrej.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu $VERSION_CODENAME main" \
+      > /etc/apt/sources.list.d/ondrej.list \
+ && apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends \
+      apache2 libapache2-mod-php5.6 php5.6-cli php5.6-sqlite3 \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN a2enmod rewrite php5.6
+
+# Mirror Dockerfile.php56 exactly so the comparison isolates the patch.
+RUN { \
+      echo 'memory_limit = 128M'; \
+      echo 'upload_max_filesize = 8M'; \
+      echo 'post_max_size = 8M'; \
+      echo 'file_uploads = On'; \
+      echo 'session.upload_progress.enabled = On'; \
+      echo 'display_errors = Off'; \
+      echo 'log_errors = On'; \
+    } > /etc/php/5.6/apache2/conf.d/zz-lab.ini
+
+COPY app/ /var/www/html/
+RUN mkdir -p /var/www/data /var/www/uploads \
+ && chown -R www-data:www-data /var/www/data /var/www/uploads
+
+EXPOSE 80
+CMD ["apache2ctl", "-D", "FOREGROUND"]

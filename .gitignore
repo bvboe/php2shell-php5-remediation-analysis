@@ -1,0 +1,6 @@
+# Fetched third-party sources, not vendored. Use scripts/fetch-sources.sh.
+sources/
+# Scanner output
+scans/
+*.json.gz
+.DS_Store

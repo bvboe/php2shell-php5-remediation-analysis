@@ -1,0 +1,37 @@
+# Pre-disclosure PHP 5.6 baseline for php2shell (CVE-2026-109618 / CVE-2026-109619)
+# research.
+#
+# Base: archived upstream php:5.6-apache == PHP 5.6.40 (10 Jan 2019), the FINAL
+# 5.6 release. Chosen deliberately as a pre-disclosure, unpatched baseline.
+#
+# This image is a throwaway research artifact. It deliberately runs an unpatched,
+# end-of-life PHP and must never be exposed to an untrusted network.
+FROM php:5.6-apache
+
+# mod_php is the SAPI the PHP advisory flags as highest risk: the vulnerable
+# request-startup path runs before any application code.
+RUN a2enmod rewrite
+
+# pdo, pdo_sqlite, sqlite3, session, openssl and fileinfo are already compiled
+# into php:5.6-apache, so no ext build (and no archived-apt access) is needed.
+
+
+# Realistic app-server posture. memory_limit matters: it is the threshold whose
+# breach drives the engine into the fatal-OOM path this bug class abuses.
+RUN { \
+      echo 'memory_limit = 128M'; \
+      echo 'upload_max_filesize = 8M'; \
+      echo 'post_max_size = 8M'; \
+      echo 'file_uploads = On'; \
+      echo 'session.upload_progress.enabled = On'; \
+      echo 'display_errors = Off'; \
+      echo 'log_errors = On'; \
+      echo 'error_log = /var/log/php_errors.log'; \
+    } > /usr/local/etc/php/conf.d/zz-lab.ini
+
+COPY app/ /var/www/html/
+RUN mkdir -p /var/www/data /var/www/uploads \
+ && chown -R www-data:www-data /var/www/data /var/www/uploads \
+ && touch /var/log/php_errors.log && chown www-data /var/log/php_errors.log
+
+EXPOSE 80

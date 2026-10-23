@@ -1,0 +1,18 @@
+# HHVM 3.30 LTS, the last series supporting PHP 5.6.
+#
+# NOTE: the published image is 3.30.12, not 3.30.13. The 3.30.13 tag exists in
+# git with no published build. HHVM 3.30 reached end of life in November 2019
+# and has received no security fix since; see FINDINGS.md section 4.
+#
+# amd64 only. On Apple silicon this runs under emulation.
+FROM hhvm/hhvm:3.30-lts-latest
+
+COPY hhvm/server.ini /etc/hhvm/server.ini
+COPY app/ /var/www/html/
+
+RUN mkdir -p /var/run/hhvm /var/www/data /var/www/uploads \
+ && chown -R www-data:www-data /var/run/hhvm /var/www/data /var/www/uploads /var/www/html
+
+EXPOSE 80
+USER www-data
+CMD ["hhvm", "--mode", "server", "--config", "/etc/hhvm/server.ini"]
